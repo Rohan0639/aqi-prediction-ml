@@ -1,0 +1,73 @@
+# ============================================================
+# AQI Prediction System - Project Configuration
+# ============================================================
+
+project:
+  name: "AQI Prediction System"
+  version: "1.0.0"
+  description: "Next-day AQI prediction for Hyderabad monitoring stations"
+
+# ── Paths ────────────────────────────────────────────────────
+paths:
+  raw_data:        "data/raw/hyderabad_air_quality_10y_combined_fixed.csv"
+  processed_data:  "data/processed/processed_aqi.csv"
+  models_dir:      "models/trained_models"
+
+# ── Data settings ────────────────────────────────────────────
+data:
+  target_column:   "Next_day_AQI"
+  date_column:     "Date"
+  station_column:  "Station"
+  test_size:       0.20
+  random_state:    42
+
+# ── Feature Engineering ──────────────────────────────────────
+features:
+  lag_days:        [1, 2, 3, 7]
+  rolling_windows: [3, 7, 14]
+  pollutant_cols:  ["PM2.5", "PM10", "NO2", "SO2", "O3", "CO"]
+  weather_cols:    ["Temperature", "Humidity", "Wind_Speed", "Rainfall"]
+
+# ── Model settings ───────────────────────────────────────────
+models:
+  linear_regression:
+    name: "LinearRegression"
+  xgboost:
+    name: "XGBoost"
+    n_estimators: 300
+    max_depth: 6
+    learning_rate: 0.05
+    subsample: 0.8
+    colsample_bytree: 0.8
+    min_child_weight: 3
+    random_state: 42
+
+# ── API settings ─────────────────────────────────────────────
+api:
+  waqi_token:   "73bef76263763e96bb7672aa0ba6c5b6fca973e7"
+  base_url:     "https://api.waqi.info"
+  default_city: "hyderabad"
+  stations:
+    - "@8677"     # Zoo Park
+    - "@14135"    # New Malakpet
+    - "@14125"    # Somajiguda
+    - "@8182"     # Sanathnagar
+    - "@7022"     # Hyderabad US Consulate
+    - "@9144"     # IDA Pashamylaram
+    - "@11284"    # Central University
+    - "@11305"    # ICRISAT Patancheru
+    - "@11295"    # Bollaram Industrial Area
+
+# ── AQI Category thresholds (India NAQI) ─────────────────────
+aqi_categories:
+  Good:       [0, 50]
+  Satisfactory: [51, 100]
+  Moderate:   [101, 200]
+  Poor:       [201, 300]
+  Very_Poor:  [301, 400]
+  Severe:     [401, 500]
+
+# ── Logging ──────────────────────────────────────────────────
+logging:
+  level: "INFO"
+  format: "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
