@@ -1,0 +1,8 @@
+{
+    "python.defaultInterpreterPath": "C:\\Users\\chint\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe",
+    "python.analysis.extraPaths": ["./"],
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.diagnosticMode": "workspace",
+    "python.languageServer": "Jedi"
+}
