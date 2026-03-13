@@ -28,7 +28,7 @@ if 'intro_played' not in st.session_state:
     st.session_state.intro_played = False
 
 def render_intro_system():
-    title_text = "Hyderabad Air Quality Prediction System"
+    title_text = "Air Quality Prediction System"
     # Create staggered spans for the title layout via python instead of JS
     spans = "".join([f"<span style='animation-delay: {0.3 + i*0.03}s'>{char if char != ' ' else '&nbsp;'}</span>" for i, char in enumerate(title_text)])
 
@@ -39,7 +39,7 @@ def render_intro_system():
             <h1 class="stagger-title">
                 {spans}
             </h1>
-            <p id="animated-subtitle">AI Powered Environmental Forecasting</p>
+            <p id="animated-subtitle">Designed for Hyderabad</p>
             <div class="loader-container">
                 <div class="loader-bar"></div>
             </div>
@@ -233,6 +233,10 @@ def get_aqi_category_color(aqi):
     if aqi <= 200: return "#ef4444" # Red
     if aqi <= 300: return "#a855f7" # Purple
     return "#9f1239" # Maroon
+
+def clean_station_name(name):
+    """Remove SPCB, commas, and trailing spaces from station names."""
+    return name.replace(" SPCB", "").replace(",", "").strip()
 
 def get_aqi_category(aqi):
     if aqi is None: return "Unknown"
@@ -551,17 +555,27 @@ if all_station_details:
     st.divider()
 
     # --- STATION SELECTION ---
-    st.markdown("### Select Monitoring Station")
-    station_names = list(all_station_details.keys())
-    selected_station = st.selectbox("Choose a station to view its specific data", station_names, label_visibility="collapsed")
+    st.markdown('<h3 style="color: #60a5fa; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">SELECT MONITORING SYSTEM</h3>', unsafe_allow_html=True)
     
+    # Create a mapping of clean names to original keys for selection
+    station_names = list(all_station_details.keys())
+    clean_to_orig = {clean_station_name(name): name for name in station_names}
+    
+    selected_clean_name = st.selectbox(
+        "Choose a station to view its specific data", 
+        options=list(clean_to_orig.keys()), 
+        label_visibility="collapsed"
+    )
+    
+    selected_station = clean_to_orig[selected_clean_name]
     station_data = all_station_details[selected_station]
+    clean_display_name = selected_clean_name
 
     # --- TOP SECTIONS ---
     col1, col2 = st.columns(2, gap="large")
 
     with col1:
-        st.subheader(f"Current AQI ({selected_station})")
+        st.subheader(f"Current AQI ({clean_display_name})")
         aqi_val = station_data.get('current_aqi', '--')
         category = get_aqi_category(aqi_val) if isinstance(aqi_val, (int, float)) else '--'
         pollutant = station_data.get('dominant_pollutant', '--')
