@@ -1,9 +1,5 @@
 # Hyderabad Air Quality Index (AQI) Prediction System
 
-![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=Streamlit&logoColor=white)
-![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![XGBoost](https://img.shields.io/badge/XGBoost-232F3E?style=for-the-badge)
-![Data Science](https://img.shields.io/badge/Data_Science-Analytics-blue?style=for-the-badge)
 
 An AI-powered environmental forecasting system designed to monitor and predict Air Quality Index (AQI) across various monitoring stations in Hyderabad, India. The project integrates real-time data from the WAQI API with high-performance XGBoost models to provide accurate 24-hour forecasts.
 
