@@ -339,20 +339,30 @@ def get_dashboard_data():
             if payload and 'model' in payload:
                 model = payload['model']
                 
-                # Get historical lag (using fallback averages if historical file is missing for a specific station)
-                aqi_yest, aqi_db_yest, aqi_3d_back = current_aqi_val, current_aqi_val, current_aqi_val
+                # -- PREPARE LAGS: T0 (Today) and T-1 (Yesterday) --
+                today_aqi = current_aqi_val
+                aqi_yest = today_aqi # Fallback
+                aqi_db_yest = today_aqi # Fallback
                 
                 if not df_all.empty:
-                    df_station = df_all[df_all['Station'] == station_name].sort_values('Date')
-                    if len(df_station) >= 3:
-                        last_3 = df_station.tail(3)['AQI'].tolist()
-                        aqi_yest, aqi_db_yest, aqi_3d_back = last_3[2], last_3[1], last_3[0]
+                    # Filter for station and ensure we only use records BEFORE today's system date for history
+                    today_str = datetime.now().strftime('%Y-%m-%d')
+                    df_station = df_all[
+                        (df_all['Station'] == station_name) & 
+                        (df_all['Date'].dt.strftime('%Y-%m-%d') < today_str)
+                    ].sort_values('Date')
+                    
+                    if len(df_station) >= 2:
+                        hist_vals = df_station.tail(2)['AQI'].tolist()
+                        aqi_yest = hist_vals[1] # T-1
+                        aqi_db_yest = hist_vals[0] # T-2
 
-                rolling_3 = (aqi_yest + aqi_db_yest + aqi_3d_back) / 3
+                # Calculate Rolling 3: (Today + Yesterday + DayBefore) / 3
+                rolling_3 = (today_aqi + aqi_yest + aqi_db_yest) / 3
 
                 # Prepare DataFrame for prediction matching exact model features
-                live_data['AQI_Lag_1'] = aqi_yest
-                live_data['AQI_Lag_2'] = aqi_db_yest
+                live_data['AQI_Lag_1'] = today_aqi  # Lag 1 is NOW Today
+                live_data['AQI_Lag_2'] = aqi_yest   # Lag 2 is NOW Yesterday
                 live_data['AQI_Rolling_3'] = rolling_3
                 
                 # Fetch dynamically correct Station_Code mapping from global model payload

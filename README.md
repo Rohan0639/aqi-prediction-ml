@@ -87,10 +87,20 @@ streamlit run dashboard.py
 ```
 
 ### Live Data Collection
-To start collecting live data in the background (helpful for long-term model improvement):
-```bash
-python live_data_collector.py
-```
+To collect live data, you can run the collector in different modes:
+
+- **Single Fetch**: Collect data once and exit.
+  ```bash
+  python live_data_collector.py --mode once
+  ```
+- **Daily Automation**: Run in the background and fetch data every 24 hours.
+  ```bash
+  python live_data_collector.py --mode daily
+  ```
+- **Hourly Updates**: For high-frequency tracking, fetch every hour.
+  ```bash
+  python live_data_collector.py --mode hourly
+  ```
 
 ---
 
