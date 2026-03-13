@@ -1,0 +1,13 @@
+--- Performance Comparison Report --- 
+Station: US Consulate
+Timestamp: 2026-03-13 14:59:46.226367
+
+Loading model from: models/station_models/us_consulate.pkl
+Loading live data from: data/live_aqi_dataset.csv
+Actual Today AQI (Live Fetch): 93.0
+Using context from Past Date: 2026-03-11
+Model Forecasted for Today: 200.81
+
+--- Analysis Results ---
+Error Variance: 107.81 AQI points
+Model Accuracy Score: 0.00%
