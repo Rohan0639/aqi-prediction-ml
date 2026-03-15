@@ -104,6 +104,18 @@ To collect live data, you can run the collector in different modes:
 
 ---
 
+## 🌐 Deployment & 24/7 Operation
+
+This project is designed for continuous monitoring. For professional 24/7 deployment:
+- **Process Management**: Use [PM2](https://pm2.keymetrics.io/) to manage the Dashboard and Data Collector processes.
+- **Auto-Restart**: PM2 will automatically restart services if they crash or the server reboots.
+- **Logging**: Use PM2's built-in logging system (`pm2 logs`) to monitor health.
+- **Cloud Hosting**: Recommended for VPS (vultr, AWS, DigitalOcean) for full control over background collectors.
+
+*For detailed instructions, see the [Deployment & Maintenance Guide](.gemini/antigravity/brain/ba8cd5f6-c84e-4cc3-89b5-97fac084c8d3/deployment_guide.md).*
+
+---
+
 ## 📊 Model Performance
 The global model currently achieves:
 - **Mean Absolute Error (MAE)**: ~6.16
