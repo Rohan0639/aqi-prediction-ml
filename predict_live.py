@@ -58,7 +58,7 @@ def predict_live():
             return
 
         # Prepare Lags: T0 (Today) and T-1 (Yesterday)
-        today_aqi = live_data['PM2.5'] # Using live reading as Today's AQI context
+        today_aqi = live_data['AQI'] # Using live IAQI as Today's AQI context
         
         print(f"Retrieving historical context for {station_name}...")
         try:

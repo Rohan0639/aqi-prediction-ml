@@ -27,7 +27,7 @@ def get_aqi_category_label(aqi):
 
 def collect_data():
     """Fetches live AQI from all mapped stations and appends to CSV."""
-    print(f"\n--- 📊 Starting Live Data Collection ({datetime.now().strftime('%Y-%m-%d %H:%M')}) ---")
+    print(f"\n--- Starting Live Data Collection ({datetime.now().strftime('%Y-%m-%d %H:%M')}) ---")
     
     new_records = []
     for name in STATION_MAP.keys():
@@ -36,11 +36,9 @@ def collect_data():
             live_vals = get_live_data(name)
             if not live_vals:
                 continue
-            
+            # get_live_data now returns concentrations in PM2.5/PM10 and raw index in 'AQI'
+            aqi_val = live_vals.get('AQI', 0) 
             now = datetime.now()
-            # Calculate a central AQI if API doesn't provide a consolidated one directly in the record
-            # Usually WAQI provides 'aqi' as the dominant pollutant's value
-            aqi_val = live_vals.get('PM2.5', 0) # Fallback to PM2.5 as primary driver
             
             record = {
                 'Date': now.strftime('%Y-%m-%d'),

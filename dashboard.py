@@ -323,8 +323,8 @@ def get_dashboard_data():
             if not live_data:
                 continue
                 
-            # Current AQI approximation based on PM2.5 (as a proxy since WAQI provides raw values or scaled IAQI)
-            current_aqi_val = int(live_data.get('PM2.5', 0)) # Using PM2.5 as primary AQI driver for display
+            # Current AQI for display (using the original sub-index/IAQI)
+            current_aqi_val = int(live_data.get('AQI', 0)) 
             dominant = calculate_dominant_pollutant(live_data)
             
             stations_current.append({
@@ -368,7 +368,8 @@ def get_dashboard_data():
                 # Fetch dynamically correct Station_Code mapping from global model payload
                 live_data['Station_Code'] = name_to_code.get(station_name, 1)
                 
-                # Ensure correct feature order, filling missing ones with 0
+                # Ensure correct feature order
+                # PM2.5 and PM10 are already concentrations in live_data (updated in fetch_live_data.py)
                 input_dict = {f: live_data.get(f, 0) for f in features}
                 df_input = pd.DataFrame([input_dict])
 
