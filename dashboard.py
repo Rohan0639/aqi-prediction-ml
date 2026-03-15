@@ -18,8 +18,8 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Auto-refresh to 5 minutes (300,000 milliseconds)
-count = st_autorefresh(interval=300000, limit=None, key="dashboard_autorefresh")
+# Auto-refresh to 2 minutes (120,000 milliseconds)
+count = st_autorefresh(interval=120000, limit=None, key="dashboard_autorefresh")
 
 # ---------------------------------------------------------
 # REBUILT INTRO ANIMATION SYSTEM
@@ -215,6 +215,43 @@ st.markdown("""
         font-size: 1.25rem;
         font-weight: 700;
     }
+    
+    /* Live Status Badge Styling */
+    .live-badge-container {
+        display: inline-flex;
+        align-items: center;
+        background: rgba(16, 185, 129, 0.1);
+        border: 1px solid rgba(16, 185, 129, 0.2);
+        padding: 4px 12px;
+        border-radius: 9999px;
+        margin-bottom: 1rem;
+    }
+    .pulse-dot {
+        width: 8px;
+        height: 8px;
+        background-color: #10b981;
+        border-radius: 50%;
+        margin-right: 8px;
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+        animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+        70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+    .live-text {
+        color: #10b981;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .update-time {
+        color: #94a3b8;
+        font-size: 0.75rem;
+        margin-left: 8px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -279,7 +316,7 @@ def calculate_dominant_pollutant(live_record):
     if not pollutants: return "Unknown"
     return max(pollutants.keys(), key=lambda k: pollutants[k])
 
-@st.cache_data(ttl=900)  # Cache backend predictions for 15 mins to avoid spamming WAQI API
+@st.cache_data(ttl=120)  # Cache for 2 mins to match auto-refresh
 def get_dashboard_data():
     """
     Connects to the backend functions (predict_live, fetch_live_data)
@@ -431,6 +468,11 @@ st.markdown(f"""
 <div class="dashboard-header">
     <h1 class="main-title">Hyderabad AQI Dashboard</h1>
     <p class="sub-title">Real-Time Forecasts & Insights</p>
+    <div class="live-badge-container">
+        <div class="pulse-dot"></div>
+        <span class="live-text">Live System Status</span>
+        <span class="update-time">Last Updated: {datetime.now().strftime('%H:%M:%S')}</span>
+    </div>
 </div>
 <style>
 .dashboard-header {{
