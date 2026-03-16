@@ -27,7 +27,7 @@ jobs:
 
       - name: Run Data Collector
         env:
-          WAQI_API_TOKEN: ${{ secrets.WAQI_API_TOKEN }}
+          AQI_API_KEY: ${{ secrets.AQI_API_KEY }}
         run: python live_data_collector.py --mode once
 
       - name: Commit and Push Changes
