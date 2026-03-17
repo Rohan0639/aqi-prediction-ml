@@ -57,7 +57,9 @@ def predict_live():
             print(f"Failed to fetch live data for {station_name}.")
             return
 
-        # Attempt to get historical context from local data for Lags and Rolling
+        # Prepare Lags: T0 (Today) and T-1 (Yesterday)
+        today_aqi = live_data['AQI'] # Using live IAQI as Today's AQI context
+        
         print(f"Retrieving historical context for {station_name}...")
         try:
             # 1. Load both historical and live datasets
@@ -65,39 +67,40 @@ def predict_live():
             live_file = 'data/live_aqi_dataset.csv'
             
             df_hist = pd.read_csv(hist_file, parse_dates=['Date'])
-            
             if os.path.exists(live_file):
                 df_live = pd.read_csv(live_file, parse_dates=['Date'])
-                # Concatenate both datasets
                 df_all = pd.concat([df_hist, df_live], ignore_index=True)
             else:
                 df_all = df_hist
 
-            # 2. Preprocess to ensure unique Date/Station pairs (keeping the last)
-            # This ensures if live data has newer values for the same day, they take precedence
-            df_all = df_all.drop_duplicates(subset=['Date', 'Station'], keep='last')
+            # 2. Filter for history (excluding today's system date)
+            today_str = pd.Timestamp.now().strftime('%Y-%m-%d')
+            df_station = df_all[
+                (df_all['Station'] == station_name) & 
+                (df_all['Date'].dt.strftime('%Y-%m-%d') < today_str)
+            ].sort_values('Date')
             
-            # 3. Filter for the current station and sort
-            df_station = df_all[df_all['Station'] == station_name].sort_values('Date')
-            
-            if len(df_station) >= 3:
-                last_3 = df_station.tail(3)['AQI'].tolist()
-                # last_3 is [aqi_3d_back, aqi_db_yest, aqi_yest]
-                aqi_yest = last_3[2]
-                aqi_db_yest = last_3[1]
-                aqi_3d_back = last_3[0]
-                print(f"  Using historical records: Yesterday={aqi_yest:.1f}, Day Before={aqi_db_yest:.1f}")
+            if len(df_station) >= 2:
+                hist_vals = df_station.tail(2)['AQI'].tolist()
+                aqi_yest = hist_vals[1] # T-1
+                aqi_db_yest = hist_vals[0] # T-2
+                print(f"  Using Context: Today={today_aqi:.1f}, Yesterday={aqi_yest:.1f}, Day Before={aqi_db_yest:.1f}")
             else:
-                raise ValueError("Not enough historical data available (need last 3 records).")
+                raise ValueError("Not enough historical data available (need at least 2 previous days).")
         except Exception as e:
             print(f"  Could not load historical context: {e}")
             print("  Please provide context manually:")
             aqi_yest = float(input("    Enter AQI from Yesterday: "))
             aqi_db_yest = float(input("    Enter AQI from Day Before: "))
-            aqi_3d_back = float(input("    Enter AQI from 3 Days Ago: "))
 
-        # Calculate Rolling 3
-        rolling_3 = (aqi_yest + aqi_db_yest + aqi_3d_back) / 3
+        # Calculate Rolling 3: (Today + Yesterday + DayBefore) / 3
+        rolling_3 = (today_aqi + aqi_yest + aqi_db_yest) / 3
+
+        # Prepare DataFrame for prediction (must match model features)
+        live_data['Station_Code'] = selection
+        live_data['AQI_Lag_1'] = today_aqi # T0
+        live_data['AQI_Lag_2'] = aqi_yest   # T-1
+        live_data['AQI_Rolling_3'] = rolling_3 # (T0+T-1+T-2)/3
 
         # Prepare DataFrame for prediction (must match model features)
         live_data['Station_Code'] = selection

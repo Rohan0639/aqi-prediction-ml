@@ -1,5 +1,9 @@
 # Hyderabad Air Quality Index (AQI) Prediction System
 
+![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=Streamlit&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![XGBoost](https://img.shields.io/badge/XGBoost-232F3E?style=for-the-badge)
+![Data Science](https://img.shields.io/badge/Data_Science-Analytics-blue?style=for-the-badge)
 
 An AI-powered environmental forecasting system designed to monitor and predict Air Quality Index (AQI) across various monitoring stations in Hyderabad, India. The project integrates real-time data from the WAQI API with high-performance XGBoost models to provide accurate 24-hour forecasts.
 
@@ -83,10 +87,32 @@ streamlit run dashboard.py
 ```
 
 ### Live Data Collection
-To start collecting live data in the background (helpful for long-term model improvement):
-```bash
-python live_data_collector.py
-```
+To collect live data, you can run the collector in different modes:
+
+- **Single Fetch**: Collect data once and exit.
+  ```bash
+  python live_data_collector.py --mode once
+  ```
+- **Daily Automation**: Run in the background and fetch data every 24 hours.
+  ```bash
+  python live_data_collector.py --mode daily
+  ```
+- **Hourly Updates**: For high-frequency tracking, fetch every hour.
+  ```bash
+  python live_data_collector.py --mode hourly
+  ```
+
+---
+
+## 🌐 Deployment & 24/7 Operation
+
+This project is designed for continuous monitoring. For professional 24/7 deployment:
+- **Process Management**: Use [PM2](https://pm2.keymetrics.io/) to manage the Dashboard and Data Collector processes.
+- **Auto-Restart**: PM2 will automatically restart services if they crash or the server reboots.
+- **Logging**: Use PM2's built-in logging system (`pm2 logs`) to monitor health.
+- **Cloud Hosting**: Recommended for VPS (vultr, AWS, DigitalOcean) for full control over background collectors.
+
+*For detailed instructions, see the [Deployment & Maintenance Guide](.gemini/antigravity/brain/ba8cd5f6-c84e-4cc3-89b5-97fac084c8d3/deployment_guide.md).*
 
 ---
 

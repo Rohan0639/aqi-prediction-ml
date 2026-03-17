@@ -51,8 +51,11 @@ def predict():
             return
         model = payload['model']
 
-        pm25 = float(input("Enter PM2.5: "))
-        pm10 = float(input("Enter PM10: "))
+        from fetch_live_data import convert_aqi_to_concentration
+
+        print("\n--- Enter Live Pollutant Indicators (AQI Sub-indices) ---")
+        pm25_aqi = float(input("Enter PM2.5 (IAQI): "))
+        pm10_aqi = float(input("Enter PM10 (IAQI): "))
         no2 = float(input("Enter NO2: "))
         so2 = float(input("Enter SO2: "))
         o3 = float(input("Enter O3: "))
@@ -61,6 +64,10 @@ def predict():
         hum = float(input("Enter Humidity: "))
         wind = float(input("Enter Wind Speed: "))
         rain = float(input("Enter Rainfall: "))
+
+        # Convert IAQI to Concentration for model compatibility
+        pm25 = convert_aqi_to_concentration(pm25_aqi, 'PM2.5')
+        pm10 = convert_aqi_to_concentration(pm10_aqi, 'PM10')
 
         print("\n--- Historical Context (Required for Lags & Rolling) ---")
         aqi_yest = float(input("Enter AQI from Yesterday (Lag 1): "))

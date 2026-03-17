@@ -13,3 +13,5 @@ plotly
 streamlit-autorefresh
 altair==4.2.2
 streamlit>=1.32
+folium
+streamlit-folium
