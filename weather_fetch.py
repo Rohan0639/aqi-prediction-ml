@@ -47,7 +47,6 @@ def fetch_weather_data():
 
             data = response.json()
 
-            # Safe extraction
             main = data.get("main", {})
             wind = data.get("wind", {})
 
@@ -61,7 +60,7 @@ def fetch_weather_data():
 
             rainfall = data.get("rain", {}).get("1h", 0.0)
 
-            weather_record = {
+            record = {
                 "Date": now.strftime("%Y-%m-%d"),
                 "Time": now.strftime("%H:%M:%S"),
                 "Station": station,
@@ -74,9 +73,9 @@ def fetch_weather_data():
                 "Rainfall": rainfall
             }
 
-            weather_data.append(weather_record)
+            weather_data.append(record)
 
-            # Safe print (no crash)
+            # Safe print
             print(
                 f"✓ {station:<22}: "
                 f"{temp if temp is not None else 'NA'}°C | "
@@ -91,6 +90,7 @@ def fetch_weather_data():
 
     return weather_data
 
+
 def save_weather_data_to_csv(weather_data, filename="data/hyderabad_live_weather.csv"):
     if not weather_data:
         print("⚠ No weather data to save.")
@@ -98,16 +98,32 @@ def save_weather_data_to_csv(weather_data, filename="data/hyderabad_live_weather
 
     os.makedirs(os.path.dirname(filename), exist_ok=True)
 
-    df = pd.DataFrame(weather_data)
+    df_new = pd.DataFrame(weather_data)
 
-    # Append instead of overwrite (better for history)
+    # If file exists → merge + update
     if os.path.exists(filename):
         df_existing = pd.read_csv(filename)
-        df = pd.concat([df_existing, df], ignore_index=True)
 
-    df.to_csv(filename, index=False)
+        # Combine
+        df_combined = pd.concat([df_existing, df_new], ignore_index=True)
 
-    print(f"\n✅ Saved {len(weather_data)} new records to {filename}")
+        # Remove duplicates → keep latest (new replaces old)
+        df_combined = df_combined.drop_duplicates(
+            subset=["Date", "Station"], keep="last"
+        )
+
+        print("🔄 Updated dataset (no duplicates, latest values kept)")
+
+    else:
+        df_combined = df_new
+        print("📁 Created new dataset")
+
+    # Save
+    df_combined.to_csv(filename, index=False)
+
+    print(f"\n✅ Dataset saved: {filename}")
+    print(f"📊 Total rows: {len(df_combined)}")
+
 
 if __name__ == "__main__":
     data = fetch_weather_data()
