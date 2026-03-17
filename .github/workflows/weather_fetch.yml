@@ -1,0 +1,47 @@
+name: Weather Data Auto Fetch
+
+permissions:
+  contents: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"   # every 6 hours
+  workflow_dispatch
+
+jobs:
+  fetch-weather:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run Weather Script
+        env:
+          WEATHER_API_KEY: ${{ secrets.WEATHER_API_KEY }}
+        run: |
+          python weather_fetch.py
+
+      - name: Commit Weather Data
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+          git add data/hyderabad_live_weather.csv
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Auto update weather data"
+            git push
+          fi
