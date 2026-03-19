@@ -316,6 +316,81 @@ def calculate_dominant_pollutant(live_record):
     if not pollutants: return "Unknown"
     return max(pollutants.keys(), key=lambda k: pollutants[k])
 
+# ---------------------------------------------------------
+# WEATHER CSV LOADER
+# ---------------------------------------------------------
+
+WEATHER_CSV_PATH = 'data/hyderabad_live_weather.csv'
+
+WIND_ICON_MAP = {
+    'N':  '⬆️',
+    'NE': '↗️',
+    'E':  '➡️',
+    'SE': '↘️',
+    'S':  '⬇️',
+    'SW': '↙️',
+    'W':  '⬅️',
+    'NW': '↖️',
+}
+
+@st.cache_data(ttl=120)
+def load_weather_from_csv():
+    """
+    Load the latest weather row per station from the CSV file.
+    Returns a dict keyed by normalised station name → weather dict.
+    TTL=120 keeps it in sync with the dashboard auto-refresh.
+    """
+    if not os.path.exists(WEATHER_CSV_PATH):
+        return {}
+    try:
+        df = pd.read_csv(WEATHER_CSV_PATH)
+        # Combine Date + Time into a single sortable datetime
+        df['_dt'] = pd.to_datetime(df['Date'].astype(str) + ' ' + df['Time'].astype(str),
+                                   errors='coerce')
+        # Keep only the latest record per station
+        df = df.sort_values('_dt').groupby('Station', as_index=False).last()
+
+        weather_map = {}
+        for _, row in df.iterrows():
+            raw_name = str(row.get('Station', '')).strip()
+            # Normalise: lowercase, remove 'spcb', collapse spaces
+            norm_name = raw_name.lower().replace('spcb', '').replace(',', '').strip()
+            weather_map[norm_name] = {
+                'raw_station':      raw_name,
+                'temperature':      row.get('Temperature', '--'),
+                'humidity':         row.get('Humidity',    '--'),
+                'pressure':         row.get('Pressure',    '--'),
+                'wind_speed':       row.get('Wind_Speed',  '--'),
+                'wind_dir_deg':     row.get('Wind_Direction_Deg',   '--'),
+                'wind_dir_label':   str(row.get('Wind_Direction_Label', '--')).strip().upper(),
+                'rainfall':         row.get('Rainfall',    '--'),
+            }
+        return weather_map
+    except Exception as e:
+        print(f"[WeatherCSV] Error loading: {e}")
+        return {}
+
+
+def get_csv_weather_for_station(station_name, weather_map):
+    """
+    Fuzzy-match `station_name` against the normalised keys in `weather_map`.
+    Returns the matched weather dict, or an empty dict if no match found.
+    """
+    # Normalise query the same way as the loader
+    query = station_name.lower().replace('spcb', '').replace(',', '').strip()
+
+    # Exact normalised match
+    if query in weather_map:
+        return weather_map[query]
+
+    # Partial / substring match (handles minor spacing differences)
+    for key, val in weather_map.items():
+        if query in key or key in query:
+            return val
+
+    return {}
+
+
 @st.cache_data(ttl=120)  # Cache for 2 mins to match auto-refresh
 def get_dashboard_data():
     """
@@ -337,18 +412,15 @@ def get_dashboard_data():
     stations_prediction = []
     all_station_details = {}
     
-    # Load historical context once for efficiency (mimics predict_live.py logic)
-    hist_file = 'data/hyderabad_air_quality_10y_combined_fixed.csv'
+    # Use only live_aqi_dataset.csv for recent lag data (T-1, T-2)
     live_file = 'data/live_aqi_dataset.csv'
-    
+
     try:
-        df_hist = pd.read_csv(hist_file, parse_dates=['Date'])
         if os.path.exists(live_file):
-            df_live = pd.read_csv(live_file, parse_dates=['Date'])
-            df_all = pd.concat([df_hist, df_live], ignore_index=True)
+            df_all = pd.read_csv(live_file, parse_dates=['Date'])
+            df_all = df_all.drop_duplicates(subset=['Date', 'Station'], keep='last')
         else:
-            df_all = df_hist
-        df_all = df_all.drop_duplicates(subset=['Date', 'Station'], keep='last')
+            df_all = pd.DataFrame()
     except:
         df_all = pd.DataFrame()
 
@@ -666,14 +738,155 @@ if all_station_details:
         </div>
         """, unsafe_allow_html=True)
 
-    # --- WEATHER SECTION ---
-    st.markdown("### Weather ")
-    if 'weather' in station_data:
-        weather = station_data['weather']
-        w_col1, w_col2, w_col3 = st.columns(3)
-        w_col1.metric("Temperature", f"{weather.get('temperature', '--')} °C")
-        w_col2.metric("Humidity", f"{weather.get('humidity', '--')} %")
-        w_col3.metric("Rainfall", f"{weather.get('rain', '--')} mm")
+    # --- WEATHER SECTION (CSV) — dynamic per station ---
+    st.markdown("### 🌬️ Live Weather Conditions")
+
+    # Load the full weather map (cached globally, TTL=120 s)
+    _wx_map  = load_weather_from_csv()
+
+    # Per-station lookup — re-evaluated every time selected_station changes
+    _wx_data = get_csv_weather_for_station(selected_station, _wx_map)
+
+    # Pull values for current station
+    _temperature    = _wx_data.get('temperature',    '--')
+    _humidity       = _wx_data.get('humidity',       '--')
+    _wind_speed     = _wx_data.get('wind_speed',     '--')
+    _wind_label     = _wx_data.get('wind_dir_label', '--')
+    _wind_deg       = _wx_data.get('wind_dir_deg',   0)
+    _wind_icon      = WIND_ICON_MAP.get(str(_wind_label).strip().upper(), '🧭')
+
+    # Safely convert degree to float for CSS rotation
+    try:
+        _deg_val = float(_wind_deg)
+    except (ValueError, TypeError):
+        _deg_val = 0.0
+
+    # Format display values
+    _temp_display     = f"{_temperature} °C" if _temperature != '--' else '--'
+    _humidity_display = f"{_humidity} %"     if _humidity    != '--' else '--'
+    _speed_display    = f"{_wind_speed} m/s" if _wind_speed  != '--' else '--'
+
+    # Station data source hint — updates as user switches station
+    _src_label = _wx_data.get('raw_station', selected_station)
+    st.caption(f"📍 Showing weather for: **{_src_label}**")
+
+    # --- ROW 1: Temperature | Humidity ---
+    wx_r1c1, wx_r1c2 = st.columns(2)
+
+    with wx_r1c1:
+        st.markdown(f"""
+        <div class="wx-card wx-temp">
+            <div class="wx-label">🌡️ Temperature</div>
+            <div class="wx-value">{_temp_display}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with wx_r1c2:
+        st.markdown(f"""
+        <div class="wx-card wx-humid">
+            <div class="wx-label">💧 Humidity</div>
+            <div class="wx-value">{_humidity_display}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Spacing between rows
+    st.markdown("<div style='margin-top:0.75rem;'></div>", unsafe_allow_html=True)
+
+    # --- ROW 2: Wind Speed | Wind Direction (rotating arrow) | empty col ---
+    wx_r2c1, wx_r2c2, wx_r2c3 = st.columns([1, 1, 1])
+
+    with wx_r2c1:
+        st.markdown(f"""
+        <div class="wx-card wx-wind">
+            <div class="wx-label">💨 Wind Speed</div>
+            <div class="wx-value">{_speed_display}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with wx_r2c2:
+        st.markdown(f"""
+        <div class="wx-card wx-wind">
+            <div class="wx-label">🧭 Wind Direction</div>
+            <div class="wx-direction-row">
+                <span class="wx-compass" style="transform: rotate({_deg_val}deg);">⬆️</span>
+                <span class="wx-dir-text">
+                    <span class="wx-dir-icon">{_wind_icon}</span>
+                    <span>{_wind_label}&nbsp;({int(_deg_val)}°)</span>
+                </span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with wx_r2c3:
+        # Placeholder to maintain grid symmetry
+        st.markdown("<div style='min-height:110px;'></div>", unsafe_allow_html=True)
+
+    # Weather card styles
+    st.markdown("""
+    <style>
+    .wx-card {
+        background: rgba(30, 41, 59, 0.55);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        border-radius: 14px;
+        padding: 1.2rem 1.4rem;
+        text-align: center;
+        transition: transform 0.25s ease, background 0.25s ease;
+        min-height: 110px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+    .wx-card:hover {
+        transform: translateY(-4px);
+        background: rgba(30, 41, 59, 0.75);
+    }
+    /* Accent top borders per card type */
+    .wx-temp  { border-top: 2px solid #f97316; }
+    .wx-humid { border-top: 2px solid #38bdf8; }
+    .wx-wind  { border-top: 2px solid #34d399; }
+
+    .wx-label {
+        color: #94a3b8;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+        font-weight: 600;
+    }
+    .wx-value {
+        color: #f1f5f9;
+        font-size: 1.9rem;
+        font-weight: 800;
+        line-height: 1.1;
+    }
+    .wx-direction-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+    }
+    .wx-compass {
+        font-size: 2.2rem;
+        display: inline-block;
+        filter: drop-shadow(0 0 6px rgba(52, 211, 153, 0.6));
+    }
+    .wx-dir-text {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.15rem;
+    }
+    .wx-dir-icon { font-size: 1.5rem; }
+    .wx-dir-text > span:last-child {
+        color: #34d399;
+        font-size: 1rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 
     # --- AQI STANDARDS TABLE ---
