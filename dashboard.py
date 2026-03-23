@@ -3,7 +3,8 @@ import pandas as pd
 import joblib
 import os
 import plotly.express as px
-from datetime import datetime
+import plotly.graph_objects as go
+from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
 from fetch_live_data import get_live_data, STATION_MAP
 from map_view import render_map_view
@@ -15,7 +16,7 @@ st.set_page_config(
     page_title="Hyderabad AQI Dashboard",
     page_icon="🌍",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
 # Auto-refresh to 2 minutes (120,000 milliseconds)
@@ -186,72 +187,173 @@ else:
 
 st.markdown("""
     <style>
-    div[data-testid="stMetricValue"] {
-        font-size: 3rem !important;
-        font-weight: 900 !important;
-    }
-    .main-metric-container {
-        padding: 1.5rem;
-        border-radius: 12px;
-        background-color: #111827; 
-        border: 1px solid #1f2937;
-        margin-bottom: 1rem;
-    }
-    .metric-title {
-        color: #9ca3af;
-        font-size: 0.875rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        font-weight: 600;
-        margin-bottom: 0.5rem;
-    }
-    .metric-value {
-        font-size: 4rem;
-        font-weight: 900;
-        line-height: 1;
-        margin-bottom: 0.5rem;
-    }
-    .metric-category {
-        font-size: 1.25rem;
-        font-weight: 700;
+    /* Global Fonts & Background Injection */
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Outfit', sans-serif;
     }
     
-    /* Live Status Badge Styling */
-    .live-badge-container {
+    /* Main Background */
+    .stApp {
+        background: linear-gradient(135deg, #020617 0%, #0f172a 50%, #082f49 100%) !important;
+        background-attachment: fixed !important;
+    }
+    
+    /* Hide Streamlit default UI elements */
+    #MainMenu {visibility: hidden;}
+    header {visibility: hidden;}
+    footer {visibility: hidden;}
+
+    /* Glassmorphism Classes */
+    .glass-card {
+        background: rgba(30, 41, 59, 0.4);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 20px;
+        padding: 1.5rem;
+        transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), background 0.3s ease, box-shadow 0.3s ease;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        margin-bottom: 1.5rem;
+    }
+    
+    .glass-card:hover {
+        transform: translateY(-4px);
+        background: rgba(30, 41, 59, 0.6);
+        box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    /* Premium Title */
+    .premium-title {
+        font-size: 3.5rem;
+        font-weight: 900;
+        background: linear-gradient(to right, #ffffff, #94a3b8);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.2rem;
+        letter-spacing: -0.02em;
+    }
+    
+    .premium-subtitle {
+        font-size: 1.2rem;
+        color: #3b82f6;
+        font-weight: 500;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        margin-bottom: 1rem;
+    }
+
+    /* Metric Layouts */
+    .metric-flex {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    .metric-label {
+        color: #94a3b8;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .metric-value {
+        font-size: 3.5rem;
+        font-weight: 800;
+        line-height: 1;
+        color: #f8fafc;
+    }
+    .metric-value.large {
+        font-size: 4.5rem;
+    }
+    .metric-tag {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-weight: 700;
+        font-size: 0.9rem;
+        margin-top: 0.5rem;
+    }
+
+    /* Live Badge */
+    .live-badge-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        margin-bottom: 2rem;
+    }
+    .live-badge {
         display: inline-flex;
         align-items: center;
         background: rgba(16, 185, 129, 0.1);
         border: 1px solid rgba(16, 185, 129, 0.2);
-        padding: 4px 12px;
+        padding: 6px 16px;
         border-radius: 9999px;
-        margin-bottom: 1rem;
+        box-shadow: 0 0 20px rgba(16, 185, 129, 0.1);
     }
-    .pulse-dot {
-        width: 8px;
-        height: 8px;
+    .pulse-dot-premium {
+        width: 10px;
+        height: 10px;
         background-color: #10b981;
         border-radius: 50%;
-        margin-right: 8px;
-        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-        animation: pulse 2s infinite;
+        margin-right: 12px;
+        box-shadow: 0 0 10px rgba(16, 185, 129, 0.8);
+        animation: pulsePremium 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
     }
-    @keyframes pulse {
+    @keyframes pulsePremium {
         0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-        70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+        70% { transform: scale(1.1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
         100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
     }
-    .live-text {
-        color: #10b981;
-        font-size: 0.75rem;
+    
+    /* Section Headers */
+    .section-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin: 2rem 0 1.5rem 0;
+    }
+    .section-title {
+        font-size: 1.5rem;
         font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
+        color: #f8fafc;
+        margin: 0;
+        white-space: nowrap;
     }
-    .update-time {
-        color: #94a3b8;
-        font-size: 0.75rem;
-        margin-left: 8px;
+    .section-line {
+        height: 1px;
+        flex-grow: 1;
+        background: linear-gradient(to right, rgba(59, 130, 246, 0.5), transparent);
     }
+
+    /* Sidebar Styling */
+    section[data-testid="stSidebar"] {
+        background-color: rgba(15, 23, 42, 0.7) !important;
+        backdrop-filter: blur(20px) !important;
+        border-right: 1px solid rgba(255,255,255,0.05) !important;
+    }
+    
+    /* Custom Scrollbar for a sleek look */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.1);
+    }
+    ::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+    
     </style>
 """, unsafe_allow_html=True)
 
@@ -531,55 +633,248 @@ def get_dashboard_data():
 
 
 # ---------------------------------------------------------
+# TREND DATA & CHART HELPERS
+# ---------------------------------------------------------
+LIVE_AQI_CSV = 'data/live_aqi_dataset.csv'
+
+@st.cache_data(ttl=120)
+def load_trend_data(station_name, days=7):
+    """Load the last N days of AQI + Temperature data for a station."""
+    if not os.path.exists(LIVE_AQI_CSV):
+        return pd.DataFrame()
+    try:
+        df = pd.read_csv(LIVE_AQI_CSV, parse_dates=['Date'])
+    except Exception:
+        return pd.DataFrame()
+
+    df = df[df['Station'] == station_name].copy()
+    if df.empty:
+        return df
+
+    cutoff = datetime.now() - timedelta(days=days)
+    df = df[df['Date'] >= cutoff]
+    df = df.sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
+    df['AQI'] = pd.to_numeric(df['AQI'], errors='coerce')
+    df['Temperature'] = pd.to_numeric(df['Temperature'], errors='coerce')
+    df = df.dropna(subset=['Date'])
+    return df[['Date', 'AQI', 'Temperature']].reset_index(drop=True)
+
+
+def render_aqi_trend_chart(df):
+    """Plotly line chart for AQI Trend with AQI-level colored markers."""
+    if df.empty or df['AQI'].dropna().empty:
+        st.info("Not enough AQI data available for this station to render the trend.")
+        return
+
+    df = df.dropna(subset=['AQI']).copy()
+    df['Color'] = df['AQI'].apply(get_aqi_category_color)
+    df['Category'] = df['AQI'].apply(get_aqi_category)
+    df['DateStr'] = df['Date'].dt.strftime('%b %d, %Y')
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=df['Date'], y=df['AQI'], mode='lines',
+        line=dict(color='rgba(59,130,246,0.15)', width=0),
+        fill='tozeroy', fillcolor='rgba(59,130,246,0.06)',
+        showlegend=False, hoverinfo='skip',
+    ))
+    fig.add_trace(go.Scatter(
+        x=df['Date'], y=df['AQI'], mode='lines+markers',
+        line=dict(color='#3b82f6', width=3, shape='spline'),
+        marker=dict(size=12, color=df['Color'],
+                    line=dict(width=2, color='#0f172a'), symbol='circle'),
+        customdata=list(zip(df['DateStr'], df['AQI'].astype(int), df['Category'])),
+        hovertemplate=(
+            '<b>%{customdata[0]}</b><br>'
+            'AQI: <b>%{customdata[1]}</b><br>'
+            'Category: %{customdata[2]}<extra></extra>'
+        ),
+        name='AQI',
+    ))
+
+    bands = [
+        (0, 50, '#22c55e'), (50, 100, '#eab308'), (100, 150, '#f97316'),
+        (150, 200, '#ef4444'), (200, 300, '#a855f7'),
+    ]
+    max_aqi = max(df['AQI'].max() * 1.15, 60)
+    for lo, hi, color in bands:
+        if lo < max_aqi:
+            fig.add_hrect(y0=lo, y1=min(hi, max_aqi),
+                          fillcolor=color, opacity=0.06,
+                          line_width=0, layer='below')
+
+    fig.update_layout(
+        template='plotly_dark',
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(15,23,42,0.5)',
+        margin=dict(l=20, r=20, t=10, b=20), height=370,
+        xaxis=dict(showgrid=False, tickformat='%b %d',
+                   tickfont=dict(size=12, color='#94a3b8')),
+        yaxis=dict(title='AQI', title_font=dict(size=13, color='#94a3b8'),
+                   gridcolor='rgba(148,163,184,0.1)',
+                   tickfont=dict(size=12, color='#94a3b8'), rangemode='tozero'),
+        hoverlabel=dict(bgcolor='#1e293b', font_size=13,
+                        font_color='#f1f5f9', bordercolor='#334155'),
+        showlegend=False,
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def render_temperature_trend_chart(df):
+    """Plotly line chart for Temperature Trend with warm orange styling."""
+    if df.empty or df['Temperature'].dropna().empty:
+        st.info("Not enough Temperature data available for this station to render the trend.")
+        return
+
+    df = df.dropna(subset=['Temperature']).copy()
+    df['DateStr'] = df['Date'].dt.strftime('%b %d, %Y')
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=df['Date'], y=df['Temperature'], mode='lines',
+        line=dict(color='rgba(249,115,22,0.15)', width=0),
+        fill='tozeroy', fillcolor='rgba(249,115,22,0.08)',
+        showlegend=False, hoverinfo='skip',
+    ))
+    fig.add_trace(go.Scatter(
+        x=df['Date'], y=df['Temperature'], mode='lines+markers',
+        line=dict(color='#f97316', width=3, shape='spline'),
+        marker=dict(size=12, color='#f97316',
+                    line=dict(width=2, color='#0f172a'), symbol='circle'),
+        customdata=list(zip(df['DateStr'], df['Temperature'].round(1))),
+        hovertemplate=(
+            '<b>%{customdata[0]}</b><br>'
+            'Temperature: <b>%{customdata[1]} °C</b><extra></extra>'
+        ),
+        name='Temperature',
+    ))
+
+    fig.update_layout(
+        template='plotly_dark',
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(15,23,42,0.5)',
+        margin=dict(l=20, r=20, t=10, b=20), height=370,
+        xaxis=dict(showgrid=False, tickformat='%b %d',
+                   tickfont=dict(size=12, color='#94a3b8')),
+        yaxis=dict(title='Temperature (°C)', title_font=dict(size=13, color='#94a3b8'),
+                   gridcolor='rgba(148,163,184,0.1)',
+                   tickfont=dict(size=12, color='#94a3b8')),
+        hoverlabel=dict(bgcolor='#1e293b', font_size=13,
+                        font_color='#f1f5f9', bordercolor='#334155'),
+        showlegend=False,
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+# ---------------------------------------------------------
+# UI COMPONENTS HELPERS
+# ---------------------------------------------------------
+
+def render_glass_metric(label, value, category, color, icon="", confidence=None, model=None, sub_text=None, border_color=None):
+    if not border_color: border_color = color
+    
+    conf_html = ""
+    if confidence is not None:
+        conf_color = "#22c55e" if confidence >= 90 else "#eab308" if confidence >= 80 else "#ef4444"
+        conf_html = f'<div style="color: {conf_color}; font-size: 0.85rem; background: {conf_color}15; padding: 2px 8px; border-radius: 6px; font-weight: 600;">🎯 {confidence}%</div>'
+        
+    model_html = f'<div style="color: #60a5fa; font-size: 0.85rem;">{model}</div>' if model else ""
+    sub_html = f'<div style="color: #94a3b8; font-size: 0.85rem; margin-top: 0.5rem;">{sub_text}</div>' if sub_text else ""
+    
+    st.markdown(f"""
+    <div class="glass-card" style="border-top: 4px solid {border_color};">
+        <div class="metric-label">{icon} {label}</div>
+        <div class="metric-value" style="color: {color};">{value}</div>
+        <div class="metric-tag" style="background-color: {color}15; color: {color}; border: 1px solid {color}30;">{category}</div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem;">
+            {model_html}
+            {conf_html}
+        </div>
+        {sub_html}
+    </div>
+    """, unsafe_allow_html=True)
+
+def render_section_header(title, icon=""):
+    st.markdown(f"""
+    <div class="section-header">
+        <h2 class="section-title">{icon} {title}</h2>
+        <div class="section-line"></div>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ---------------------------------------------------------
 # RENDER UI
 # ---------------------------------------------------------
 
-st.divider()
-
+# Header
 st.markdown(f"""
-<div class="dashboard-header">
-    <h1 class="main-title">Hyderabad AQI Dashboard</h1>
-    <p class="sub-title">Real-Time Forecasts & Insights</p>
-    <div class="live-badge-container">
-        <div class="pulse-dot"></div>
-        <span class="live-text">Live System Status</span>
-        <span class="update-time">Last Updated: {datetime.now().strftime('%H:%M:%S')}</span>
+<div style="text-align: center; padding: 2rem 0;">
+    <h1 class="premium-title">Hyderabad AQI Dashboard</h1>
+    <div class="premium-subtitle">Real-Time Forecasts & Insights</div>
+</div>
+<div class="live-badge-wrapper">
+    <div class="live-badge">
+        <div class="pulse-dot-premium"></div>
+        <span style="color: #10b981; font-weight: 700; font-size: 0.85rem; letter-spacing: 0.05em; text-transform: uppercase;">
+            Live System Active <span style="color: #6ee7b7; font-weight: 400; margin-left: 8px;">| Updated: {datetime.now().strftime('%H:%M')}</span>
+        </span>
     </div>
 </div>
-<style>
-.dashboard-header {{
-    text-align: center;
-    padding: 1rem 0 2rem 0;
-    margin-bottom: 1rem;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-}}
-.main-title {{
-    font-size: 3rem;
-    font-weight: 900;
-    color: #f8fafc;
-    margin-bottom: 0.5rem;
-}}
-.sub-title {{
-    font-size: 1.1rem;
-    color: #3b82f6;
-}}
-@media (max-width: 768px) {{
-    .main-title {{ font-size: 2.2rem; }}
-    .sub-title {{ font-size: 1rem; }}
-}}
-</style>
 """, unsafe_allow_html=True)
 
+# Sidebar
+st.sidebar.markdown("""
+<div style="padding: 1rem 0; text-align: center;">
+    <h2 style="font-weight: 800; font-size: 1.5rem; margin-bottom: 0;">AQI Engine</h2>
+    <div style="color: #3b82f6; font-size: 0.8rem; text-transform: uppercase;">Control Panel</div>
+</div>
+""", unsafe_allow_html=True)
 
-# --- SIDEBAR NAVIGATION ---
-st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["Dashboard", "Hyderabad Station Map"])
+page = st.sidebar.radio("Navigation", ["Dashboard", "Hyderabad Station Map", "AQI Categories Info"], label_visibility="collapsed")
+
+st.sidebar.markdown("<br><br><br>", unsafe_allow_html=True)
+st.sidebar.caption("Powered by Wait-for-it Model • v2.0 Premium")
 
 with st.spinner("Executing Models and Fetching WAQI Live Environmental Data..."):
     all_station_details, stations_current, stations_prediction = get_dashboard_data()
 
 if page == "Hyderabad Station Map":
     render_map_view(all_station_details)
+    st.stop()
+    
+elif page == "AQI Categories Info":
+    render_section_header("AQI Health & Categories Guide", "📖")
+    st.markdown("""
+    <div class="glass-card" style="padding: 2.5rem; text-align: center;">
+        <h3 style="font-size: 2rem; font-weight: 800; margin-bottom: 2rem;">Air Quality Index Reference</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; text-align: left;">
+            <div style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); padding: 1.5rem; border-radius: 12px; transition: transform 0.2s; cursor: default;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                <h4 style="color: #22c55e; margin: 0 0 0.5rem 0; font-size: 1.25rem;">● Good (0 - 50)</h4>
+                <p style="color: #cbd5e1; font-size: 0.95rem; line-height: 1.5; margin:0;">Air quality is considered satisfactory, and air pollution poses little or no risk.</p>
+            </div>
+            <div style="background: rgba(234, 179, 8, 0.1); border: 1px solid rgba(234, 179, 8, 0.3); padding: 1.5rem; border-radius: 12px; transition: transform 0.2s; cursor: default;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                <h4 style="color: #eab308; margin: 0 0 0.5rem 0; font-size: 1.25rem;">● Moderate (51 - 100)</h4>
+                <p style="color: #cbd5e1; font-size: 0.95rem; line-height: 1.5; margin:0;">Air quality is acceptable; however, there may be a moderate health concern for a very small number of people.</p>
+            </div>
+            <div style="background: rgba(249, 115, 22, 0.1); border: 1px solid rgba(249, 115, 22, 0.3); padding: 1.5rem; border-radius: 12px; transition: transform 0.2s; cursor: default;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                <h4 style="color: #f97316; margin: 0 0 0.5rem 0; font-size: 1.25rem;">● Unhealthy for Sensitive Groups (101 - 150)</h4>
+                <p style="color: #cbd5e1; font-size: 0.95rem; line-height: 1.5; margin:0;">Members of sensitive groups may experience health effects. The general public is not likely to be affected.</p>
+            </div>
+            <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 1.5rem; border-radius: 12px; transition: transform 0.2s; cursor: default;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                <h4 style="color: #ef4444; margin: 0 0 0.5rem 0; font-size: 1.25rem;">● Unhealthy (151 - 200)</h4>
+                <p style="color: #cbd5e1; font-size: 0.95rem; line-height: 1.5; margin:0;">Everyone may begin to experience health effects; members of sensitive groups may experience more serious health effects.</p>
+            </div>
+            <div style="background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.3); padding: 1.5rem; border-radius: 12px; transition: transform 0.2s; cursor: default;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                <h4 style="color: #a855f7; margin: 0 0 0.5rem 0; font-size: 1.25rem;">● Very Unhealthy (201 - 300)</h4>
+                <p style="color: #cbd5e1; font-size: 0.95rem; line-height: 1.5; margin:0;">Health alert: everyone may experience more serious health effects.</p>
+            </div>
+            <div style="background: rgba(159, 18, 57, 0.1); border: 1px solid rgba(159, 18, 57, 0.3); padding: 1.5rem; border-radius: 12px; transition: transform 0.2s; cursor: default;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                <h4 style="color: #9f1239; margin: 0 0 0.5rem 0; font-size: 1.25rem;">● Hazardous (301 - 500)</h4>
+                <p style="color: #cbd5e1; font-size: 0.95rem; line-height: 1.5; margin:0;">Health warnings of emergency conditions. The entire population is more likely to be affected.</p>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     st.stop()
 
 if all_station_details:
@@ -590,21 +885,20 @@ if all_station_details:
     avg_current_aqi = int(sum(valid_current_aqi) / len(valid_current_aqi)) if valid_current_aqi else None
     avg_pred_aqi = int(sum(valid_pred_aqi) / len(valid_pred_aqi)) if valid_pred_aqi else None
 
-    # --- TOP AVERAGE SUMMARY CARD ---
-    st.markdown("### 🌆 Hyderabad City Summary")
-    
-    avg_col1, avg_col2 = st.columns(2, gap="medium")
+    # City Averages UI
+    render_section_header("City Overview", "🌆")
+    avg_col1, avg_col2 = st.columns(2, gap="large")
     
     with avg_col1:
         cat_curr = get_aqi_category(avg_current_aqi) if avg_current_aqi else '--'
         color_curr = get_aqi_category_color(avg_current_aqi) if avg_current_aqi else 'gray'
-        st.markdown(f"""
-        <div class="city-avg-card" style="border-top: 4px solid {color_curr};">
-            <div class="avg-label">Average Live AQI</div>
-            <div class="avg-value" style="color: {color_curr};">{avg_current_aqi if avg_current_aqi else '--'}</div>
-            <div class="avg-cat" style="background-color: {color_curr}20; color: {color_curr};">{cat_curr}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        render_glass_metric(
+            label="Average Live AQI",
+            value=avg_current_aqi if avg_current_aqi else '--',
+            category=cat_curr,
+            color=color_curr,
+            icon="📡"
+        )
 
     with avg_col2:
         cat_pred = get_aqi_category(avg_pred_aqi) if avg_pred_aqi else '--'
@@ -615,7 +909,7 @@ if all_station_details:
         if avg_current_aqi and avg_pred_aqi:
             if avg_pred_aqi > avg_current_aqi:
                 trend_arrow = "↑"
-                trend_text = "Expected to worsens"
+                trend_text = "Expected to worsen"
                 t_color = "#ef4444"
             elif avg_pred_aqi < avg_current_aqi:
                 trend_arrow = "↓"
@@ -626,316 +920,105 @@ if all_station_details:
                 trend_text = "Staying stable"
                 t_color = "#9ca3af"
 
-        st.markdown(f"""
-        <div class="city-avg-card" style="border-top: 4px solid {color_pred};">
-            <div class="avg-label">Forecasted Average (24h)</div>
-            <div class="avg-value" style="color: {color_pred};">
-                {avg_pred_aqi if avg_pred_aqi else '--'}
-                <span style="font-size: 1.5rem; vertical-align: middle; margin-left: 5px; color: {t_color if trend_text else color_pred};">{trend_arrow}</span>
-            </div>
-            <div class="avg-cat" style="color: {t_color if trend_text else color_pred}; font-size: 0.9rem;">{trend_text if trend_text else cat_pred}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # Inject styling for the city-avg-card
-    st.markdown("""
-    <style>
-    .city-avg-card {
-        background: rgba(30, 41, 59, 0.5);
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.05);
-        border-radius: 16px;
-        padding: 1.5rem;
-        text-align: center;
-        transition: transform 0.3s ease;
-    }
-    .city-avg-card:hover {
-        transform: translateY(-5px);
-        background: rgba(30, 41, 59, 0.7);
-    }
-    .avg-label {
-        color: #94a3b8;
-        font-size: 0.85rem;
-        text-transform: uppercase;
-        letter-spacing: 0.1em;
-        font-weight: 600;
-        margin-bottom: 0.5rem;
-    }
-    .avg-value {
-        font-size: 3.5rem;
-        font-weight: 800;
-        line-height: 1;
-        margin-bottom: 0.5rem;
-    }
-    .avg-cat {
-        display: inline-block;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-weight: 700;
-        font-size: 1rem;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    st.divider()
+        sub_html = f"<span style='color:{t_color};'><b style='font-size:1.1rem;'>{trend_arrow}</b> {trend_text}</span>" if trend_text else ""
+        
+        render_glass_metric(
+            label="Forecasted Average (24h)",
+            value=avg_pred_aqi if avg_pred_aqi else '--',
+            category=cat_pred,
+            color=color_pred,
+            icon="🔮",
+            sub_text=sub_html
+        )
 
     # --- STATION SELECTION ---
-    st.markdown('<h3 style="color: #60a5fa; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">SELECT MONITORING SYSTEM</h3>', unsafe_allow_html=True)
+    render_section_header("Station Intelligence", "📍")
     
-    # Create a mapping of clean names to original keys for selection
     station_names = list(all_station_details.keys())
     clean_to_orig = {clean_station_name(name): name for name in station_names}
     
     selected_clean_name = st.selectbox(
-        "Choose a station to view its specific data", 
+        "Select Monitoring Node", 
         options=list(clean_to_orig.keys()), 
         label_visibility="collapsed"
     )
     
     selected_station = clean_to_orig[selected_clean_name]
     station_data = all_station_details[selected_station]
-    clean_display_name = selected_clean_name
-
-    # --- TOP SECTIONS ---
+    
     col1, col2 = st.columns(2, gap="large")
 
     with col1:
-        st.subheader(f"Current AQI ({clean_display_name})")
         aqi_val = station_data.get('current_aqi', '--')
         category = get_aqi_category(aqi_val) if isinstance(aqi_val, (int, float)) else '--'
         pollutant = station_data.get('dominant_pollutant', '--')
         color = get_aqi_category_color(aqi_val if isinstance(aqi_val, (int, float)) else None)
         
-        st.markdown(f"""
-        <div class="main-metric-container" style="border-left: 6px solid {color};">
-            <div class="metric-title">Live API Reading</div>
-            <div class="metric-value" style="color: {color};">{aqi_val}</div>
-            <div class="metric-category" style="color: {color};">Category: {category}</div>
-            <div style="color: #d1d5db; margin-top: 0.5rem; font-weight: 500;">Dominant Pollutant: {pollutant}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        render_glass_metric(
+            label=f"Live Reading — {selected_clean_name}",
+            value=aqi_val,
+            category=category,
+            color=color,
+            icon="🔴",
+            sub_text=f"Dominant Pollutant: <b class='text-white'>{pollutant}</b>",
+            border_color="#3b82f6"
+        )
 
     with col2:
-        st.subheader("Tomorrow AQI Prediction")
         pred_aqi = station_data.get('predicted_aqi', '--')
         pred_cat = get_aqi_category(pred_aqi) if isinstance(pred_aqi, (int, float)) else '--'
         model_name = station_data.get('model_used', '--')
         confidence = station_data.get('confidence_score', '--')
         color = get_aqi_category_color(pred_aqi if isinstance(pred_aqi, (int, float)) else None)
         
-        # Determine confidence color
-        conf_color = "#22c55e" if isinstance(confidence, float) and confidence >= 90 else "#eab308" if isinstance(confidence, float) and confidence >= 80 else "#ef4444"
-        
-        st.markdown(f"""
-        <div class="main-metric-container" style="border-left: 6px solid {color};">
-            <div class="metric-title">AI Forecast</div>
-            <div class="metric-value" style="color: {color};">{pred_aqi}</div>
-            <div class="metric-category" style="color: {color};">Category: {pred_cat}</div>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
-                <div style="color: #60a5fa; font-weight: 500;">Model: {model_name}</div>
-                <div style="color: {conf_color}; font-weight: 700; background-color: {conf_color}20; padding: 2px 8px; border-radius: 4px;">🎯 Confidence: {confidence}%</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        render_glass_metric(
+            label="AI Prediction (Tomorrow)",
+            value=pred_aqi,
+            category=pred_cat,
+            color=color,
+            icon="🤖",
+            model=model_name,
+            confidence=confidence,
+            border_color="#8b5cf6"
+        )
 
-    # --- WEATHER SECTION (CSV) — dynamic per station ---
-    st.markdown("### 🌬️ Live Weather Conditions")
 
-    # Load the full weather map (cached globally, TTL=120 s)
-    _wx_map  = load_weather_from_csv()
-
-    # Per-station lookup — re-evaluated every time selected_station changes
+    # --- WEATHER SECTION (CSV) ---
+    render_section_header("Environmental Conditions", "🌬️")
+    
+    _wx_map = load_weather_from_csv()
     _wx_data = get_csv_weather_for_station(selected_station, _wx_map)
 
-    # Pull values for current station
-    _temperature    = _wx_data.get('temperature',    '--')
-    _humidity       = _wx_data.get('humidity',       '--')
-    _wind_speed     = _wx_data.get('wind_speed',     '--')
-    _wind_label     = _wx_data.get('wind_dir_label', '--')
-    _wind_deg       = _wx_data.get('wind_dir_deg',   0)
-    _wind_icon      = WIND_ICON_MAP.get(str(_wind_label).strip().upper(), '🧭')
+    _temperature = _wx_data.get('temperature', '--')
+    _humidity = _wx_data.get('humidity', '--')
+    _wind_speed = _wx_data.get('wind_speed', '--')
+    _wind_label = _wx_data.get('wind_dir_label', '--')
 
-    # Safely convert degree to float for CSS rotation
-    try:
-        _deg_val = float(_wind_deg)
-    except (ValueError, TypeError):
-        _deg_val = 0.0
-
-    # Format display values
-    _temp_display     = f"{_temperature} °C" if _temperature != '--' else '--'
-    _humidity_display = f"{_humidity} %"     if _humidity    != '--' else '--'
-    _speed_display    = f"{_wind_speed} m/s" if _wind_speed  != '--' else '--'
-
-    # Station data source hint — updates as user switches station
-    _src_label = _wx_data.get('raw_station', selected_station)
-    st.caption(f"📍 Showing weather for: **{_src_label}**")
-
-    # --- ROW 1: Temperature | Humidity ---
-    wx_r1c1, wx_r1c2 = st.columns(2)
-
-    with wx_r1c1:
-        st.markdown(f"""
-        <div class="wx-card wx-temp">
-            <div class="wx-label">🌡️ Temperature</div>
-            <div class="wx-value">{_temp_display}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with wx_r1c2:
-        st.markdown(f"""
-        <div class="wx-card wx-humid">
-            <div class="wx-label">💧 Humidity</div>
-            <div class="wx-value">{_humidity_display}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    # Spacing between rows
-    st.markdown("<div style='margin-top:0.75rem;'></div>", unsafe_allow_html=True)
-
-    # --- ROW 2: Wind Speed | Wind Direction (rotating arrow) | empty col ---
-    wx_r2c1, wx_r2c2, wx_r2c3 = st.columns([1, 1, 1])
-
-    with wx_r2c1:
-        st.markdown(f"""
-        <div class="wx-card wx-wind">
-            <div class="wx-label">💨 Wind Speed</div>
-            <div class="wx-value">{_speed_display}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with wx_r2c2:
-        st.markdown(f"""
-        <div class="wx-card wx-wind">
-            <div class="wx-label">🧭 Wind Direction</div>
-            <div class="wx-direction-row">
-                <span class="wx-compass" style="transform: rotate({_deg_val}deg);">⬆️</span>
-                <span class="wx-dir-text">
-                    <span class="wx-dir-icon">{_wind_icon}</span>
-                    <span>{_wind_label}&nbsp;({int(_deg_val)}°)</span>
-                </span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with wx_r2c3:
-        # Placeholder to maintain grid symmetry
-        st.markdown("<div style='min-height:110px;'></div>", unsafe_allow_html=True)
-
-    # Weather card styles
-    st.markdown("""
-    <style>
-    .wx-card {
-        background: rgba(30, 41, 59, 0.55);
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.07);
-        border-radius: 14px;
-        padding: 1.2rem 1.4rem;
-        text-align: center;
-        transition: transform 0.25s ease, background 0.25s ease;
-        min-height: 110px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        gap: 0.5rem;
-    }
-    .wx-card:hover {
-        transform: translateY(-4px);
-        background: rgba(30, 41, 59, 0.75);
-    }
-    /* Accent top borders per card type */
-    .wx-temp  { border-top: 2px solid #f97316; }
-    .wx-humid { border-top: 2px solid #38bdf8; }
-    .wx-wind  { border-top: 2px solid #34d399; }
-
-    .wx-label {
-        color: #94a3b8;
-        font-size: 0.78rem;
-        text-transform: uppercase;
-        letter-spacing: 0.09em;
-        font-weight: 600;
-    }
-    .wx-value {
-        color: #f1f5f9;
-        font-size: 1.9rem;
-        font-weight: 800;
-        line-height: 1.1;
-    }
-    .wx-direction-row {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.75rem;
-        flex-wrap: wrap;
-    }
-    .wx-compass {
-        font-size: 2.2rem;
-        display: inline-block;
-        filter: drop-shadow(0 0 6px rgba(52, 211, 153, 0.6));
-    }
-    .wx-dir-text {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.15rem;
-    }
-    .wx-dir-icon { font-size: 1.5rem; }
-    .wx-dir-text > span:last-child {
-        color: #34d399;
-        font-size: 1rem;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-
-    # --- AQI STANDARDS TABLE ---
-    st.markdown("""
-    <div style="margin-top: 2rem;">
-        <h3 style="margin-bottom: 1rem;">Air Quality Index (AQI) Categories</h3>
-        <table style="width:100%; border-collapse: collapse; background-color: #0f172a; border-radius: 12px; overflow: hidden; font-family: 'Outfit', sans-serif;">
-            <thead>
-                <tr style="background-color: #1e293b; text-align: left;">
-                    <th style="padding: 12px 20px; color: #94a3b8; font-weight: 600;">AQI Range</th>
-                    <th style="padding: 12px 20px; color: #94a3b8; font-weight: 600;">Category</th>
-                    <th style="padding: 12px 20px; color: #94a3b8; font-weight: 600; text-align: center;">Indicator</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                    <td style="padding: 12px 20px; color: #f8fafc; font-weight: 500;">0 - 50</td>
-                    <td style="padding: 12px 20px; color: #22c55e; font-weight: 700;">Good</td>
-                    <td style="padding: 12px 20px; text-align: center;"><div style="width: 14px; height: 14px; background-color: #22c55e; border-radius: 50%; display: inline-block;"></div></td>
-                </tr>
-                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                    <td style="padding: 12px 20px; color: #f8fafc; font-weight: 500;">51 - 100</td>
-                    <td style="padding: 12px 20px; color: #eab308; font-weight: 700;">Moderate</td>
-                    <td style="padding: 12px 20px; text-align: center;"><div style="width: 14px; height: 14px; background-color: #eab308; border-radius: 50%; display: inline-block;"></div></td>
-                </tr>
-                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                    <td style="padding: 12px 20px; color: #f8fafc; font-weight: 500;">101 - 150</td>
-                    <td style="padding: 12px 20px; color: #f97316; font-weight: 700;">Unhealthy for Sensitive Groups</td>
-                    <td style="padding: 12px 20px; text-align: center;"><div style="width: 14px; height: 14px; background-color: #f97316; border-radius: 50%; display: inline-block;"></div></td>
-                </tr>
-                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                    <td style="padding: 12px 20px; color: #f8fafc; font-weight: 500;">151 - 200</td>
-                    <td style="padding: 12px 20px; color: #ef4444; font-weight: 700;">Unhealthy</td>
-                    <td style="padding: 12px 20px; text-align: center;"><div style="width: 14px; height: 14px; background-color: #ef4444; border-radius: 50%; display: inline-block;"></div></td>
-                </tr>
-                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                    <td style="padding: 12px 20px; color: #f8fafc; font-weight: 500;">201 - 300</td>
-                    <td style="padding: 12px 20px; color: #a855f7; font-weight: 700;">Very Unhealthy</td>
-                    <td style="padding: 12px 20px; text-align: center;"><div style="width: 14px; height: 14px; background-color: #a855f7; border-radius: 50%; display: inline-block;"></div></td>
-                </tr>
-                <tr>
-                    <td style="padding: 12px 20px; color: #f8fafc; font-weight: 500;">301 - 500</td>
-                    <td style="padding: 12px 20px; color: #9f1239; font-weight: 700;">Hazardous</td>
-                    <td style="padding: 12px 20px; text-align: center;"><div style="width: 14px; height: 14px; background-color: #9f1239; border-radius: 50%; display: inline-block;"></div></td>
-                </tr>
-            </tbody>
-        </table>
+    wx_c1, wx_c2, wx_c3 = st.columns(3, gap="medium")
+    
+    weather_card_html = """
+    <div class="glass-card" style="text-align: center; border-top: 2px solid {border}; padding: 1.5rem 1rem;">
+        <div style="font-size: 2rem; margin-bottom: 0.5rem;">{icon}</div>
+        <div style="color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.25rem; font-weight: 600;">{label}</div>
+        <div style="font-size: 1.75rem; font-weight: 800; color: #f8fafc;">{value}</div>
     </div>
-    """, unsafe_allow_html=True)
+    """
+    
+    with wx_c1:
+        st.markdown(weather_card_html.format(border="#f97316", icon="🌡️", label="Temperature", value=f"{_temperature} °C" if _temperature != '--' else '--'), unsafe_allow_html=True)
+    with wx_c2:
+        st.markdown(weather_card_html.format(border="#38bdf8", icon="💧", label="Humidity", value=f"{_humidity} %" if _humidity != '--' else '--'), unsafe_allow_html=True)
+    with wx_c3:
+        st.markdown(weather_card_html.format(border="#34d399", icon="💨", label="Wind", value=f"{_wind_speed} m/s {_wind_label}" if _wind_speed != '--' else '--'), unsafe_allow_html=True)
+
+    # --- 7-DAY TREND CHARTS ---
+    render_section_header("Historical Trends", "📈")
+    
+    trend_df = load_trend_data(selected_station, days=7)
+    
+    st.markdown('<div class="glass-card" style="padding: 1rem 1.5rem 0.5rem 1.5rem; border-top: 2px solid #a855f7;">', unsafe_allow_html=True)
+    render_aqi_trend_chart(trend_df)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 else:
     st.error("Failed to execute ML models or retrieve API Data. Ensure models are trained inside `models/`.")

@@ -32,16 +32,20 @@ jobs:
         env:
           WEATHER_API_KEY: ${{ secrets.WEATHER_API_KEY }}
         run: |
+          echo "Fetching weather data..."
           python weather_fetch.py
 
       - name: Commit Weather Data
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
+
+          # Pull latest changes to avoid conflicts
+          git pull origin main --rebase
+
           git add data/hyderabad_live_weather.csv
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "Auto update weather data"
-            git push
-          fi
+
+          # Commit only if there are changes
+          git commit -m "Auto update weather data $(date)" || echo "No changes to commit"
+
+          git push origin main

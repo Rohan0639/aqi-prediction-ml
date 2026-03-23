@@ -85,30 +85,44 @@ def render_map_view(all_station_details):
     # Create map centered on Hyderabad
     m = folium.Map(location=[17.4000, 78.4000], zoom_start=11, tiles="OpenStreetMap")
 
-    # Add markers
+    # Add markers with styled tooltips
     for station_name, details in all_station_details.items():
         if station_name in stations_coords:
             coord = stations_coords[station_name]
             aqi = details.get('current_aqi', 0)
             color = get_folium_color(aqi)
-            
+            category = get_aqi_category(aqi) if isinstance(aqi, (int, float)) else '--'
+            hex_color = get_aqi_category_color(aqi) if isinstance(aqi, (int, float)) else 'gray'
+
+            # Clean station name for display
+            display_name = station_name.replace(' SPCB', '').replace(',', '').strip()
+
+            # Rich HTML tooltip shown on hover
+            tooltip_html = f"""
+            <div style="font-family: 'Segoe UI', Arial, sans-serif; padding: 4px 6px; min-width: 140px;">
+                <b style="font-size: 13px;">{display_name}</b><br>
+                <span style="color: {hex_color}; font-weight: 700; font-size: 12px;">AQI: {aqi} — {category}</span>
+            </div>
+            """
+
             folium.CircleMarker(
                 location=[coord['lat'], coord['lon']],
-                radius=12,
-                tooltip=station_name, # Key for st_folium identification
+                radius=10,
+                tooltip=folium.Tooltip(tooltip_html, sticky=True),
+                popup=station_name,  # Used for click detection by st_folium
                 color=color,
                 fill=True,
                 fill_color=color,
-                fill_opacity=0.8
+                fill_opacity=0.8,
             ).add_to(m)
 
     # Display map and capture output
-    map_data = st_folium(m, width=1100, height=550, key="hyderabad_aqi_map")
+    map_data = st_folium(m, width=700, height=380, key="hyderabad_aqi_map")
 
     # Handle Click Interaction
     selected_from_map = None
-    if map_data and map_data.get("last_object_clicked_tooltip"):
-        selected_from_map = map_data["last_object_clicked_tooltip"]
+    if map_data and map_data.get("last_object_clicked_popup"):
+        selected_from_map = map_data["last_object_clicked_popup"]
 
     if selected_from_map and selected_from_map in all_station_details:
         st.markdown(f"## Station Details: {selected_from_map}")
