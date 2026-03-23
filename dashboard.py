@@ -202,7 +202,8 @@ st.markdown("""
     
     /* Hide Streamlit default UI elements */
     #MainMenu {visibility: hidden;}
-    header {visibility: hidden;}
+    .stDeployButton {display: none;}
+    header[data-testid="stHeader"] {background: transparent;}
     footer {visibility: hidden;}
 
     /* Glassmorphism Classes */
@@ -636,28 +637,43 @@ def get_dashboard_data():
 # TREND DATA & CHART HELPERS
 # ---------------------------------------------------------
 LIVE_AQI_CSV = 'data/live_aqi_dataset.csv'
+HISTORICAL_CSV = 'data/hyderabad_air_quality_10y_combined_fixed.csv'
 
 @st.cache_data(ttl=120)
 def load_trend_data(station_name, days=7):
-    """Load the last N days of AQI + Temperature data for a station."""
-    if not os.path.exists(LIVE_AQI_CSV):
-        return pd.DataFrame()
-    try:
-        df = pd.read_csv(LIVE_AQI_CSV, parse_dates=['Date'])
-    except Exception:
+    """Load the last N days of AQI + Temperature data for a station from combined sources."""
+    dfs = []
+    
+    if os.path.exists(HISTORICAL_CSV):
+        try:
+            dfs.append(pd.read_csv(HISTORICAL_CSV, parse_dates=['Date']))
+        except Exception:
+            pass
+            
+    if os.path.exists(LIVE_AQI_CSV):
+        try:
+            dfs.append(pd.read_csv(LIVE_AQI_CSV, parse_dates=['Date']))
+        except Exception:
+            pass
+            
+    if not dfs:
         return pd.DataFrame()
 
+    df = pd.concat(dfs, ignore_index=True)
     df = df[df['Station'] == station_name].copy()
     if df.empty:
         return df
 
-    cutoff = datetime.now() - timedelta(days=days)
-    df = df[df['Date'] >= cutoff]
+    # Drop duplicates keeping the latest ones
     df = df.sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
+    
     df['AQI'] = pd.to_numeric(df['AQI'], errors='coerce')
     df['Temperature'] = pd.to_numeric(df['Temperature'], errors='coerce')
-    df = df.dropna(subset=['Date'])
-    return df[['Date', 'AQI', 'Temperature']].reset_index(drop=True)
+    df = df.dropna(subset=['Date', 'AQI'])
+    
+    # Take the last N available days (avoids empty charts if live data falls behind)
+    df = df.tail(days).reset_index(drop=True)
+    return df[['Date', 'AQI', 'Temperature']]
 
 
 def render_aqi_trend_chart(df):
@@ -774,25 +790,32 @@ def render_glass_metric(label, value, category, color, icon="", confidence=None,
     if not border_color: border_color = color
     
     conf_html = ""
-    if confidence is not None:
-        conf_color = "#22c55e" if confidence >= 90 else "#eab308" if confidence >= 80 else "#ef4444"
-        conf_html = f'<div style="color: {conf_color}; font-size: 0.85rem; background: {conf_color}15; padding: 2px 8px; border-radius: 6px; font-weight: 600;">🎯 {confidence}%</div>'
+    if confidence is not None and confidence != '--':
+        try:
+            c_val = float(confidence)
+            conf_color = "#22c55e" if c_val >= 90 else "#eab308" if c_val >= 80 else "#ef4444"
+            conf_html = f'<div style="color: {conf_color}; font-size: 0.85rem; background: {conf_color}15; padding: 2px 8px; border-radius: 6px; font-weight: 600;">🎯 {c_val}%</div>'
+        except:
+            pass
         
-    model_html = f'<div style="color: #60a5fa; font-size: 0.85rem;">{model}</div>' if model else ""
+    model_html = f'<div style="color: #60a5fa; font-size: 0.85rem;">{model}</div>' if model and model != '--' and model != 'Model: --' else ""
     sub_html = f'<div style="color: #94a3b8; font-size: 0.85rem; margin-top: 0.5rem;">{sub_text}</div>' if sub_text else ""
     
-    st.markdown(f"""
-    <div class="glass-card" style="border-top: 4px solid {border_color};">
-        <div class="metric-label">{icon} {label}</div>
-        <div class="metric-value" style="color: {color};">{value}</div>
-        <div class="metric-tag" style="background-color: {color}15; color: {color}; border: 1px solid {color}30;">{category}</div>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem;">
-            {model_html}
-            {conf_html}
-        </div>
-        {sub_html}
-    </div>
-    """, unsafe_allow_html=True)
+    flex_div = ""
+    if model_html or conf_html:
+        flex_div = f'<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem;">{model_html}{conf_html}</div>'
+
+    html_content = f'<div class="glass-card" style="border-left: 4px solid {border_color};">'
+    html_content += f'<div class="metric-label">{icon} {label}</div>'
+    html_content += f'<div class="metric-value" style="color: {color};">{value}</div>'
+    html_content += f'<div class="metric-tag" style="background-color: {color}15; color: {color}; border: 1px solid {color}30;">{category}</div>'
+    if flex_div:
+        html_content += flex_div
+    if sub_html:
+        html_content += sub_html
+    html_content += '</div>'
+    
+    st.markdown(html_content, unsafe_allow_html=True)
 
 def render_section_header(title, icon=""):
     st.markdown(f"""
@@ -816,7 +839,7 @@ st.markdown(f"""
     <div class="live-badge">
         <div class="pulse-dot-premium"></div>
         <span style="color: #10b981; font-weight: 700; font-size: 0.85rem; letter-spacing: 0.05em; text-transform: uppercase;">
-            Live System Active <span style="color: #6ee7b7; font-weight: 400; margin-left: 8px;">| Updated: {datetime.now().strftime('%H:%M')}</span>
+            LIVE SYSTEM STATUS <span style="color: #6ee7b7; font-weight: 400; margin-left: 8px;">Last Updated: {datetime.now().strftime('%H:%M:%S')}</span>
         </span>
     </div>
 </div>
@@ -825,8 +848,8 @@ st.markdown(f"""
 # Sidebar
 st.sidebar.markdown("""
 <div style="padding: 1rem 0; text-align: center;">
-    <h2 style="font-weight: 800; font-size: 1.5rem; margin-bottom: 0;">AQI Engine</h2>
-    <div style="color: #3b82f6; font-size: 0.8rem; text-transform: uppercase;">Control Panel</div>
+    <h2 style="font-weight: 800; font-size: 1.5rem; margin-bottom: 0;">AQI CONTROL PANEL</h2>
+    <div style="color: #3b82f6; font-size: 0.8rem; text-transform: uppercase;"></div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -886,18 +909,18 @@ if all_station_details:
     avg_pred_aqi = int(sum(valid_pred_aqi) / len(valid_pred_aqi)) if valid_pred_aqi else None
 
     # City Averages UI
-    render_section_header("City Overview", "🌆")
+    render_section_header("Hyderabad City Summary", "🏙️")
     avg_col1, avg_col2 = st.columns(2, gap="large")
     
     with avg_col1:
         cat_curr = get_aqi_category(avg_current_aqi) if avg_current_aqi else '--'
         color_curr = get_aqi_category_color(avg_current_aqi) if avg_current_aqi else 'gray'
         render_glass_metric(
-            label="Average Live AQI",
+            label="AVERAGE LIVE AQI",
             value=avg_current_aqi if avg_current_aqi else '--',
             category=cat_curr,
             color=color_curr,
-            icon="📡"
+            icon=""
         )
 
     with avg_col2:
@@ -923,16 +946,16 @@ if all_station_details:
         sub_html = f"<span style='color:{t_color};'><b style='font-size:1.1rem;'>{trend_arrow}</b> {trend_text}</span>" if trend_text else ""
         
         render_glass_metric(
-            label="Forecasted Average (24h)",
-            value=avg_pred_aqi if avg_pred_aqi else '--',
+            label="FORECASTED AVERAGE (24H)",
+            value=f"{avg_pred_aqi} {trend_arrow}" if avg_pred_aqi else '--',
             category=cat_pred,
             color=color_pred,
-            icon="🔮",
+            icon="",
             sub_text=sub_html
         )
 
     # --- STATION SELECTION ---
-    render_section_header("Station Intelligence", "📍")
+    render_section_header("SELECT MONITORING SYSTEM 🔗", "")
     
     station_names = list(all_station_details.keys())
     clean_to_orig = {clean_station_name(name): name for name in station_names}
@@ -949,42 +972,45 @@ if all_station_details:
     col1, col2 = st.columns(2, gap="large")
 
     with col1:
+        st.markdown(f"### Current AQI ({selected_clean_name})")
         aqi_val = station_data.get('current_aqi', '--')
-        category = get_aqi_category(aqi_val) if isinstance(aqi_val, (int, float)) else '--'
+        category = f"Category: {get_aqi_category(aqi_val)}" if isinstance(aqi_val, (int, float)) else '--'
         pollutant = station_data.get('dominant_pollutant', '--')
         color = get_aqi_category_color(aqi_val if isinstance(aqi_val, (int, float)) else None)
         
         render_glass_metric(
-            label=f"Live Reading — {selected_clean_name}",
+            label=f"LIVE API READING",
             value=aqi_val,
             category=category,
             color=color,
-            icon="🔴",
-            sub_text=f"Dominant Pollutant: <b class='text-white'>{pollutant}</b>",
-            border_color="#3b82f6"
+            icon="",
+            sub_text=f"Dominant Pollutant: {pollutant}",
+            border_color="#f97316"
         )
 
     with col2:
+        st.markdown(f"### Tomorrow AQI Prediction")
         pred_aqi = station_data.get('predicted_aqi', '--')
-        pred_cat = get_aqi_category(pred_aqi) if isinstance(pred_aqi, (int, float)) else '--'
-        model_name = station_data.get('model_used', '--')
+        pred_cat = f"Category: {get_aqi_category(pred_aqi)}" if isinstance(pred_aqi, (int, float)) else '--'
+        model_name = "Model: " + station_data.get('model_used', '--')
         confidence = station_data.get('confidence_score', '--')
         color = get_aqi_category_color(pred_aqi if isinstance(pred_aqi, (int, float)) else None)
         
         render_glass_metric(
-            label="AI Prediction (Tomorrow)",
+            label="AI FORECAST",
             value=pred_aqi,
             category=pred_cat,
             color=color,
-            icon="🤖",
+            icon="",
             model=model_name,
             confidence=confidence,
-            border_color="#8b5cf6"
+            border_color="#f97316"
         )
 
 
     # --- WEATHER SECTION (CSV) ---
-    render_section_header("Environmental Conditions", "🌬️")
+    render_section_header("Live Weather Conditions", "🌬️")
+    st.markdown(f"<p style='color: #94a3b8; font-size: 0.9rem; margin-top: -1.5rem; margin-bottom: 1.5rem;'>📍 Showing weather for: {selected_station}</p>", unsafe_allow_html=True)
     
     _wx_map = load_weather_from_csv()
     _wx_data = get_csv_weather_for_station(selected_station, _wx_map)
@@ -993,11 +1019,14 @@ if all_station_details:
     _humidity = _wx_data.get('humidity', '--')
     _wind_speed = _wx_data.get('wind_speed', '--')
     _wind_label = _wx_data.get('wind_dir_label', '--')
+    _wind_deg = _wx_data.get('wind_dir_deg', '--')
+    _wind_icon = WIND_ICON_MAP.get(_wind_label, '🧭')
 
-    wx_c1, wx_c2, wx_c3 = st.columns(3, gap="medium")
+    wx_c1, wx_c2 = st.columns(2, gap="medium")
+    wx_c3, wx_c4 = st.columns(2, gap="medium")
     
     weather_card_html = """
-    <div class="glass-card" style="text-align: center; border-top: 2px solid {border}; padding: 1.5rem 1rem;">
+    <div class="glass-card" style="text-align: center; padding: 1.5rem 1rem;">
         <div style="font-size: 2rem; margin-bottom: 0.5rem;">{icon}</div>
         <div style="color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.25rem; font-weight: 600;">{label}</div>
         <div style="font-size: 1.75rem; font-weight: 800; color: #f8fafc;">{value}</div>
@@ -1009,10 +1038,12 @@ if all_station_details:
     with wx_c2:
         st.markdown(weather_card_html.format(border="#38bdf8", icon="💧", label="Humidity", value=f"{_humidity} %" if _humidity != '--' else '--'), unsafe_allow_html=True)
     with wx_c3:
-        st.markdown(weather_card_html.format(border="#34d399", icon="💨", label="Wind", value=f"{_wind_speed} m/s {_wind_label}" if _wind_speed != '--' else '--'), unsafe_allow_html=True)
+        st.markdown(weather_card_html.format(border="#34d399", icon="💨", label="Wind Speed", value=f"{_wind_speed} m/s" if _wind_speed != '--' else '--'), unsafe_allow_html=True)
+    with wx_c4:
+        st.markdown(weather_card_html.format(border="#9ca3af", icon="🧭", label="Wind Direction", value=f"<span style='font-size: 1.75rem; vertical-align: middle;'>{_wind_icon}</span> <span style='font-size: 1.25rem; vertical-align: middle; color: #34d399;'>{_wind_label} ({_wind_deg}°)</span>" if _wind_label != '--' else '--'), unsafe_allow_html=True)
 
     # --- 7-DAY TREND CHARTS ---
-    render_section_header("Historical Trends", "📈")
+    render_section_header(f"Historical Trends of {selected_clean_name}", "📈")
     
     trend_df = load_trend_data(selected_station, days=7)
     

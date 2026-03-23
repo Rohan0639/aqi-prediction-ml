@@ -1,5 +1,6 @@
 import streamlit as st
 import folium
+from folium import plugins
 from streamlit_folium import st_folium
 import pandas as pd
 
@@ -83,7 +84,10 @@ def render_map_view(all_station_details):
         return "darkred"
 
     # Create map centered on Hyderabad
-    m = folium.Map(location=[17.4000, 78.4000], zoom_start=11, tiles="OpenStreetMap")
+    m = folium.Map(location=[17.4000, 78.4000], zoom_start=11, tiles="CartoDB dark_matter")
+    
+    # Add Current Location Button
+    plugins.LocateControl(position="topleft", strings={"title": "Show my current location", "popup": "You are here"}).add_to(m)
 
     # Add markers with styled tooltips
     for station_name, details in all_station_details.items():
@@ -175,13 +179,19 @@ def render_map_view(all_station_details):
     st.markdown("### AQI Color Legend")
     l_cols = st.columns(6)
     legend_items = [
-        ("Good (0-50)", "green"),
-        ("Satisfactory (51-100)", "yellow"),
-        ("Moderate (101-200)", "orange"),
-        ("Poor (201-300)", "red"),
-        ("Very Poor (301-300)", "purple"),
-        ("Severe (401+)", "darkred")
+        ("Good (0-50)", "#22c55e"),
+        ("Satisfactory (51-100)", "#eab308"),
+        ("Moderate (101-200)", "#f97316"),
+        ("Poor (201-300)", "#ef4444"),
+        ("Very Poor (301-400)", "#a855f7"),
+        ("Severe (401+)", "#9f1239")
     ]
     for i, (text, color) in enumerate(legend_items):
         with l_cols[i % 6]:
-            st.markdown(f'<div style="display: flex; align-items: center;"><div style="width: 15px; height: 15px; background-color: {color}; border-radius: 50%; margin-right: 8px;"></div><span style="font-size: 0.8rem;">{text}</span></div>', unsafe_allow_html=True)
+            html = f'''
+            <div style="display: flex; align-items: center; margin-bottom: 0.5rem; justify-content: center;">
+                <div style="min-width: 14px; min-height: 14px; max-width: 14px; max-height: 14px; background-color: {color}; border-radius: 50%; margin-right: 8px;"></div>
+                <span style="font-size: 0.85rem; font-weight: 600; color: #f8fafc; line-height: 1.2;">{text.replace(" (", "<br>(")}</span>
+            </div>
+            '''
+            st.markdown(html, unsafe_allow_html=True)
