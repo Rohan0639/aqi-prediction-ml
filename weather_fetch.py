@@ -8,7 +8,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # API Key
-API_KEY = os.getenv("WEATHER_API_KEY", "c02ebe7947b6de1013509a77af765329")
+API_KEY = os.getenv("WEATHER_API_KEY")
+if not API_KEY:
+    raise ValueError("WEATHER_API_KEY environment variable is not set.")
 
 # Station coordinates
 STATIONS = {
