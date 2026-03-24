@@ -1,14 +1,15 @@
-name: Hourly Data Auto Fetch
+name: Run Live Predictions
 
 permissions:
   contents: write
 
 on:
-  # DISABLED: replaced by fetch_aqi.yml, fetch_weather.yml, and run_predictions.yml
+  schedule:
+    - cron: '30 */2 * * *'
   workflow_dispatch:
 
 jobs:
-  fetch-all-data:
+  run-predictions:
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -28,33 +29,24 @@ jobs:
       - name: Install Dependencies
         run: pip install -r requirements.txt
 
-      - name: Run Data Collection Scripts
-        env:
-          AQI_API_KEY: ${{ secrets.AQI_API_KEY }}
-          WEATHER_API_KEY: ${{ secrets.WEATHER_API_KEY }}
+      - name: Run Live Predictions
         run: |
-          echo "Fetching AQI data..."
-          python live_data_collector.py --mode once
-          
-          echo "Fetching Weather data..."
-          python weather_fetch.py
+          echo "Running live AQI predictions..."
+          python predict_live.py
 
-      - name: Commit and Push Changes
+      - name: Commit and Push Prediction Results
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
 
-          # Inject token into remote URL so pull & push both authenticate
           git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
 
-          # Pull latest changes to avoid conflicts
           git pull origin main --rebase
 
-          git add data/live_aqi_dataset.csv data/hyderabad_live_weather.csv
+          git add data/
 
-          # Commit only if there are changes
-          git commit -m "Auto update AQI & Weather data $(date)" || echo "No changes to commit"
+          git commit -m "Auto update prediction results $(date)" || echo "No changes to commit"
 
           git push origin main
