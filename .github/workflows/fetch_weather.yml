@@ -1,4 +1,4 @@
-name: Fetch Weather Data
+name: Fetch Live AQI & Weather Data
 
 permissions:
   contents: write
@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  fetch-weather:
+  fetch-data:
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -29,23 +29,30 @@ jobs:
       - name: Install Dependencies
         run: pip install -r requirements.txt
 
-      - name: Fetch Weather Data
+      - name: Fetch Live AQI Data
+        env:
+          AQI_API_KEY: ${{ secrets.AQI_API_KEY }}
+        run: |
+          echo "Fetching live AQI data..."
+          python live_data_collector.py --mode once
+
+      - name: Fetch Live Weather Data
         env:
           WEATHER_API_KEY: ${{ secrets.WEATHER_API_KEY }}
         run: |
-          echo "Fetching Weather data..."
+          echo "Fetching live Weather data..."
           python weather_fetch.py
 
-      - name: Commit and Push Weather Data
+      - name: Commit and Push All Data
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "actions@github.com"
-          
+
           git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
-          
-          git add data/hyderabad_live_weather.csv
-          git pull origin main --rebase --autostash
-          git commit -m "Auto update Weather data $(date)" || echo "No changes to commit"
+
+          git add data/live_aqi_dataset.csv data/hyderabad_live_weather.csv
+          git commit -m "Auto update AQI & Weather data $(date)" || echo "No changes to commit"
+          git pull origin main --rebase
           git push origin main
