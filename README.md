@@ -6,6 +6,7 @@ An AI-powered environmental forecasting system designed to monitor and predict A
 
 ---
 
+
 ## 🌟 Key Features
 
 - **Live Monitoring**: Real-time AQI tracking across multiple Hyderabad stations (Balanagar, HITEC City, Sanathnagar, etc.).
@@ -125,4 +126,6 @@ The global model currently achieves:
 This project is for educational and demonstration purposes.
 
 ---
+
 *Developed with focus on Environmental Intelligence for the city of Hyderabad.*
+[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen?style=for-the-badge&logo=streamlit)](https://rohan0639-aqi-prediction-ml-dashboard-szecpg.streamlit.app/)
